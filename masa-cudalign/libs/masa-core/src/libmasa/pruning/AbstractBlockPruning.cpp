@@ -23,6 +23,7 @@
 #include "AbstractBlockPruning.hpp"
 #include <algorithm>
 #include <stdlib.h>
+#include <errno.h>
 #include "../../common/Job.hpp"
 
 #include <sys/shm.h>
@@ -39,6 +40,29 @@ AbstractBlockPruning::AbstractBlockPruning() {
 	this->max_i = 0;
 	this->max_j = 0;
 
+	// Tentativa de obter a área de memória compartilhada
+	if ((this->sharedMemID = shmget(0x706964, sizeof(struct shared_mem), 0x1ff)) < 0) {
+	    if (errno == ENOENT) {
+	        // A área de memória compartilhada ainda não existe
+	        printf("AbstractBlockPrunning\n");
+	        printf("Shared memory does not exist. Proceeding without it.\n");
+	        // Realize alguma ação apropriada para o seu caso
+	    } else {
+	        // Outro erro ocorreu
+	        printf("AbstractBlockPrunning\n");
+	        printf("Error getting shared memory %d!\n", 0x706964);
+	        exit(EXIT_FAILURE);
+	    }
+	} else {
+	    // A área de memória compartilhada existe, então podemos anexá-la
+	    this->sharedMemPtr = (struct shared_mem *)shmat(sharedMemID, (char *)0, 0);
+	    if (this->sharedMemPtr == (struct shared_mem *)-1) {
+	        printf("AbstractBlockPrunning\n");
+	        printf("Error in attach!\n");
+	        exit(EXIT_FAILURE);
+	    }
+	}
+	/*
 	if ((sharedMemID = shmget(0x706964, sizeof(struct shared_mem), 0x1ff)) < 0) {
     	printf("AbstractBlockPrunning\n");
     	printf("Error getting shared memory %d!\n", 0x706964);	
@@ -50,6 +74,7 @@ AbstractBlockPruning::AbstractBlockPruning() {
     	printf("Error in attach!\n");
     	exit(EXIT_FAILURE);
   	}
+	*/
 
 }
 
@@ -60,14 +85,17 @@ AbstractBlockPruning::~AbstractBlockPruning() {
 
 void AbstractBlockPruning::updateBestScore(int score) {
 
-	if (this->sharedMemPtr->isReady) {
-		printf("Escore heurístico lido pelo CUDAlign.\n");
-		this->sharedMemPtr->isReady = false;
-		if (this->sharedMemPtr->blast_score > score && 
-			this->sharedMemPtr->blast_score > this->bestScore) {
-				this->bestScore = this->sharedMemPtr->blast_score;
-				return;
-			}
+	// Check if the shared memory has been obtained 
+	if (this->sharedMemID > 0) {
+		if (this->sharedMemPtr->isReady) {
+			printf("Escore heurístico lido pelo CUDAlign.\n");
+			this->sharedMemPtr->isReady = false;
+			if (this->sharedMemPtr->blast_score > score && 
+				this->sharedMemPtr->blast_score > this->bestScore) {
+					this->bestScore = this->sharedMemPtr->blast_score;
+					return;
+				}
+		}
 	}
 
 	if (this->bestScore < score) {

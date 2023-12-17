@@ -26,7 +26,7 @@ struct shared_mem
   int blast_score;
 };
 
-time_t startTime, endTime, blastEnd;
+time_t startTime, endTime, blastEnd = 0;
 
 using namespace std;
 
@@ -195,7 +195,7 @@ void execute_async(string file1, string file1_blast, string file2, string file2_
 
 int execute(int option, string file1, string file2)
 {
- 
+  int childReturn;
   time(&startTime);
   filesystem::remove_all("./work.tmp");
 
@@ -214,6 +214,7 @@ int execute(int option, string file1, string file2)
     break;
   case 2:
     execute_cudalign(file1, file2, -1);
+    wait(&childReturn);
     break;
   default:
     return -1;
@@ -223,6 +224,7 @@ int execute(int option, string file1, string file2)
   time(&endTime);
   double blastTime = double(blastEnd - startTime);
   double totalTime = double(endTime - startTime);
+  if (option == 2) blastTime = 0;
   printf("Tempo de Execução do BLASTn: %lf\n", blastTime);
   printf("Tempo de Execução Total (BLASTn + CUDAlign): %lf\n", totalTime);
 
